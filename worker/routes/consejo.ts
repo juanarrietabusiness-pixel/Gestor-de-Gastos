@@ -45,9 +45,9 @@ const MAX_VUELTAS = 4;
 /** Turnos que se aceptan en una conversacion. Ver el limite mas abajo. */
 const MAX_MENSAJES = 40;
 
-const INSTRUCCIONES = `Eres el consejero financiero de este hogar. Dos personas,
-Abrinay y Avalon, que ademas llevan dos negocios (PanaClaw y BukoFlow) en el
-mismo libro de cuentas.
+const INSTRUCCIONES = `Eres el consejero financiero de este hogar. Una pareja que
+ademas lleva su negocio, Juancito Ads, en el mismo libro de cuentas. Los
+nombres de las personas y de cada economia estan en el contexto.
 
 COMO RESPONDER
 
@@ -214,7 +214,7 @@ const HERRAMIENTA: Anthropic.Tool = {
   name: 'buscar_movimientos',
   description:
     'Los movimientos uno por uno, para cuando los totales del contexto no '
-    + 'alcanzan: "¿en qué se fue la comida este mes?", "¿qué cobró PanaClaw en '
+    + 'alcanzan: "¿en qué se fue la comida este mes?", "¿qué cobró Juancito Ads en '
     + 'agosto?". Devuelve como máximo 60, del más nuevo al más viejo.',
   input_schema: {
     type: 'object',

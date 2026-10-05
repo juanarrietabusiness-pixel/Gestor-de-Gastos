@@ -44,3 +44,28 @@ export const JARRAS_INICIALES: {
   { name: 'Libertad financiera', percentageBp: 1000, icon: 'trending-up', color: '#f59e0b', acumula: true },
   { name: 'Donaciones', percentageBp: 500, icon: 'heart-handshake', color: '#f43f5e', acumula: false },
 ];
+
+/**
+ * Los negocios con los que nace el hogar, ademas de Familia.
+ *
+ * Cada uno trae solo sus categorias: con eso ya se puede cargar un cobro o un
+ * gasto del negocio desde el primer dia, porque el movimiento hereda la
+ * economia de su categoria. Las jarras no se siembran: un negocio sin jarras
+ * no reparte nada, y sus porcentajes (impuestos, operacion, lo que le pasa a
+ * la casa) son una decision que se toma desde la app.
+ */
+export const NEGOCIOS_INICIALES: {
+  name: string; icon: string; color: string;
+  categorias: { name: string; type: 'ingreso' | 'gasto'; icon: string; color: string }[];
+}[] = [
+  {
+    name: 'Juancito Ads', icon: 'briefcase', color: '#9a6a06',
+    categorias: [
+      { name: 'Cobros de clientes', type: 'ingreso', icon: 'handshake', color: '#10b981' },
+      { name: 'Pauta publicitaria', type: 'gasto', icon: 'trending-up', color: '#f59e0b' },
+      { name: 'Herramientas y software', type: 'gasto', icon: 'laptop', color: '#3b82f6' },
+      { name: 'Colaboradores', type: 'gasto', icon: 'users', color: '#8b5cf6' },
+      { name: 'Impuestos', type: 'gasto', icon: 'landmark', color: '#64748b' },
+    ],
+  },
+];

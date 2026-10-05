@@ -53,10 +53,10 @@ jobs:
 
       - name: Ejecutar la prueba
         env:
-          # La URL publicada. Se puede sobrescribir con la variable URL_APP
-          # (Settings > Secrets and variables > Actions > Variables) si algun
-          # dia se cambia el nombre del Worker o se pasa a dominio propio.
-          URL_APP: ${{ vars.URL_APP || 'https://gestor-de-gastos.abrinay1997.workers.dev' }}
+          # La URL publicada, la que muestra el resumen del workflow Publicar.
+          # Va en la variable URL_APP (Settings > Secrets and variables >
+          # Actions > Variables). Sin ella, la prueba se niega a correr.
+          URL_APP: ${{ vars.URL_APP }}
           # Solo la prueba 'alta' la usa, para ejercitar el camino real.
           SETUP_KEY: ${{ secrets.SETUP_KEY }}
         run: |

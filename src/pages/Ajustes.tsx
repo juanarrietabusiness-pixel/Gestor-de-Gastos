@@ -896,7 +896,7 @@ function EditorEntidad({ entidad, alCerrar }: { entidad: Entity | null; alCerrar
           etiqueta="Nombre"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="PanaClaw, BukoFlow..."
+          placeholder="Juancito Ads, otro negocio..."
         />
 
         <div className="grid grid-cols-2 gap-2">

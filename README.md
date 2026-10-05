@@ -11,6 +11,13 @@ Cloudflare. Sin Google, sin Firebase, sin servicios de terceros.
   volver la conexión.
 - **Instalable.** PWA: se agrega a la pantalla de inicio y abre como app nativa.
 
+Este repo es el de Juan, y arranca de cero. El código viene del gestor de
+Abrinay ([abrinay1997-stack/Gestor-de-Gastor](https://github.com/abrinay1997-stack/Gestor-de-Gastor)),
+usado con su permiso; sus datos no vienen con él, porque viven en su propia
+base de D1 y no en el código. El hogar de acá nace con dos economías:
+**Familia** (la casa, con sus categorías y sus seis jarras) y **Juancito Ads**
+(el negocio, con sus categorías y sin jarras hasta que se le armen).
+
 ## Cómo está armado
 
 | Pieza | Tecnología | Por qué |
@@ -52,10 +59,9 @@ Hacer merge de un pull request **no publica**: solo verifica.
 
 | | Estado |
 |---|---|
-| Base de datos `gastos-db` | creada en la cuenta (region ENAM) |
-| Esquema (9 tablas, 15 indices) | aplicado y probado contra D1 real |
-| Migracion `0001_init.sql` | registrada en `d1_migrations` |
-| `database_id` en `wrangler.toml` | escrito |
+| Base de datos `gastos-db` | creada en la cuenta de Cloudflare de Juan (region ENAM), vacía |
+| `database_id` en `wrangler.toml` | escrito (`34985d23-c6cc-4c31-8005-da551781a9cc`) |
+| Esquema (las 13 migraciones) | lo aplica el workflow **Publicar** en el primer despliegue |
 | Workflows de CI y despliegue | listos |
 
 ### Lo que falta: tres secretos
@@ -114,9 +120,9 @@ resumen de la corrida te muestra la URL.
 
 ### Crear el hogar
 
-Entra a esa URL. Te pide la `SETUP_KEY`, tu nombre, email y contraseña.
-Despues, en **Ajustes → Sumar a tu pareja**, le creas la cuenta a ella y le
-pasas email y contraseña.
+Entra a esa URL. Te pide la `SETUP_KEY`, tu nombre, email y contraseña. El
+hogar nace con Familia y Juancito Ads. Despues, en **Ajustes → Sumar a tu
+pareja**, le creas la cuenta a tu pareja y le pasas email y contraseña.
 
 ### Instalarla en el telefono
 
@@ -176,7 +182,9 @@ puede fallar de verdad (la hibernación de sockets, que las dos personas caigan
 en la misma instancia del hogar, el upgrade de protocolo detrás del borde)
 solo existe en producción.
 
-Para eso está **Actions → Probar tiempo real → Run workflow**. Siembra un hogar
+Para eso está **Actions → Probar tiempo real → Run workflow**. Necesita la
+variable `URL_APP` (Settings → Secrets and variables → Actions → *Variables*)
+con la URL que mostró el workflow Publicar. Siembra un hogar
 de prueba, abre dos WebSockets como si fueran dos teléfonos, verifica que un
 alta y una baja lleguen al otro lado, y borra todo lo sembrado. Tarda unos 20
 segundos y no toca los datos reales: todo cuelga de un `household_id` propio
@@ -227,7 +235,7 @@ sumar 100% dentro de un ámbito: un cobro de un negocio se reparte entre las
 jarras de ese negocio, y a la casa la plata le llega después.
 
 **Cuando el negocio le paga a la casa, no se mueve ninguna cuenta.** Las
-cuentas están mezcladas: no hay una que sea de PanaClaw. La plata ya está ahí,
+cuentas están mezcladas: no hay una que sea de Juancito Ads. La plata ya está ahí,
 lo que cambia es de quién es. Por eso el pago sale de una jarra del negocio y
 entra repartido en las de la casa, con las reglas de la casa, y **no cuenta
 como ingreso**: el negocio ya lo contó cuando cobró, y contarlo dos veces
@@ -240,7 +248,7 @@ por economía, saldos de cuentas y jarras, gasto por categoría, los últimos do
 meses— junto con las reglas que hacen falta para interpretarlos y qué guarda
 cada tabla.
 
-Existe para que puedas pedirle a Claude (o a quien sea) «¿PanaClaw da o no
+Existe para que puedas pedirle a Claude (o a quien sea) «¿Juancito Ads da o no
 da?» sin que tenga que leerse el código. Sin esto, responder eso obliga a leer
 las migraciones para entender el esquema, el dominio para saber cómo se calcula
 un saldo, y después los movimientos crudos para sumarlos a mano: miles de

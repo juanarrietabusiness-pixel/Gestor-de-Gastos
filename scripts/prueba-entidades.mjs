@@ -53,7 +53,7 @@ async function main() {
   console.log(`\nProbando contra ${BASE}\n`);
   const email = `ent+${Date.now()}@ejemplo.test`;
 
-  console.log('1. Hogar nuevo: nace con Familia');
+  console.log('1. Hogar nuevo: nace con Familia y Juancito Ads');
   const alta = await pedir('/api/setup', { method: 'POST', body: JSON.stringify({
     email, password: await derivar('contraseña-larga', email), displayName: 'Abrinay',
     householdName: 'Casa', currency: 'USD', setupKey: 'clave-de-prueba' }) });
@@ -61,12 +61,17 @@ async function main() {
 
   let snap = (await pedir('/api/snapshot')).datos;
   ok('el snapshot trae entidades', Array.isArray(snap.entities), typeof snap.entities);
-  ok('nace una sola, Familia', snap.entities.length === 1 && snap.entities[0].name === 'Familia',
+  ok('nacen dos, Familia primero', snap.entities.length === 2
+     && snap.entities[0].name === 'Familia' && snap.entities[1].name === 'Juancito Ads',
      JSON.stringify(snap.entities?.map((e) => e.name)));
   const familia = snap.entities[0].id;
-  ok('las categorias de la semilla ya cuelgan de ella',
-     snap.categories.every((c) => c.entityId === familia));
-  ok('las jarras tambien', snap.jars.every((j) => j.entityId === familia));
+  const juancito = snap.entities[1].id;
+  ok('Juancito Ads es un negocio', snap.entities[1].kind === 'negocio', snap.entities[1].kind);
+  ok('las categorias de la semilla cuelgan de una de las dos',
+     snap.categories.every((c) => c.entityId === familia || c.entityId === juancito));
+  ok('Juancito Ads trae las suyas, con un ingreso',
+     snap.categories.some((c) => c.entityId === juancito && c.type === 'ingreso'));
+  ok('las jarras son todas de Familia', snap.jars.every((j) => j.entityId === familia));
 
   console.log('\n2. Los dos negocios');
   const pc = (await pedir('/api/entities', { method: 'POST', body: JSON.stringify({ name: 'PanaClaw', kind: 'negocio' }) })).datos.entity;

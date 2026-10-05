@@ -12,7 +12,7 @@ import {
 import { aMember } from '../db.ts';
 import type { Env } from '../env.ts';
 import { ahora, claveDerivada, color, cuerpo, email, error, json, nuevoId, texto } from '../http.ts';
-import { CATEGORIAS_INICIALES, JARRAS_INICIALES } from '../seed.ts';
+import { CATEGORIAS_INICIALES, JARRAS_INICIALES, NEGOCIOS_INICIALES } from '../seed.ts';
 
 const esHttps = (req: Request): boolean => new URL(req.url).protocol === 'https:';
 
@@ -70,7 +70,7 @@ export async function setup(req: Request, env: Env): Promise<Response> {
 function sentenciasSemilla(env: Env, householdId: string, t: number) {
   const out = [];
 
-  // La entidad Familia, y todo lo que se siembra cuelga de ella. El id es
+  // La entidad Familia, y las categorias y jarras de la casa cuelgan de ella. El id es
   // deterministico igual que en la migracion 0005, para que un hogar creado
   // antes y uno creado despues se vean iguales.
   const familiaId = `${householdId}:familia`;
@@ -100,6 +100,28 @@ function sentenciasSemilla(env: Env, householdId: string, t: number) {
       ).bind(nuevoId(), householdId, j.name, j.percentageBp, j.color, j.icon, i,
              j.acumula ? 1 : 0, t, familiaId),
     );
+  }
+
+  // Los negocios, despues de Familia y con sus propias categorias. El orden de
+  // las categorias sigue al de la casa para que no se mezclen en las listas.
+  let orden = CATEGORIAS_INICIALES.length;
+  for (const [i, n] of NEGOCIOS_INICIALES.entries()) {
+    const entidadId = nuevoId();
+    out.push(
+      env.DB.prepare(
+        `INSERT INTO entity (id, household_id, name, kind, color, icon, display_order, archived, created_at)
+         VALUES (?1, ?2, ?3, 'negocio', ?4, ?5, ?6, 0, ?7)`,
+      ).bind(entidadId, householdId, n.name, n.color, n.icon, i + 1, t),
+    );
+    for (const c of n.categorias) {
+      out.push(
+        env.DB.prepare(
+          `INSERT INTO category (id, household_id, name, type, parent_id, icon, color,
+                                 archived, display_order, created_at, entity_id)
+           VALUES (?1, ?2, ?3, ?4, NULL, ?5, ?6, 0, ?7, ?8, ?9)`,
+        ).bind(nuevoId(), householdId, c.name, c.type, c.icon, c.color, orden++, t, entidadId),
+      );
+    }
   }
 
   return out;
