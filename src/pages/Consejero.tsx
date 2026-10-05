@@ -169,9 +169,9 @@ export function Consejero() {
             texto="El consejero necesita una clave de la API de Claude cargada en los secretos de Cloudflare. Mientras tanto, el resto de la app funciona igual."
           />
           <p className="t-nota txt-3 text-center px-2 leading-relaxed -mt-2">
-            Se carga una sola vez, desde la terminal:
+            Se carga una sola vez como secreto de GitHub, con el nombre
             <br />
-            <code className="t-nota">wrangler secret put ANTHROPIC_API_KEY</code>
+            <code className="t-nota">ANTHROPIC_API_KEY</code>, y se vuelve a publicar.
           </p>
         </Tarjeta>
       </div>

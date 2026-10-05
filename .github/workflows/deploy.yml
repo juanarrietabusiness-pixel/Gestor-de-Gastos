@@ -166,6 +166,20 @@ jobs:
           printf '%s' "$SETUP_KEY" | npx wrangler secret put SETUP_KEY
           echo "SETUP_KEY sincronizada."
 
+      # Igual que la de arriba, para el consejero. Sin el secreto de GitHub se
+      # salta y el Worker conserva la clave que ya tuviera (o sigue sin ella, y
+      # solo el consejero queda apagado).
+      - name: Sincronizar ANTHROPIC_API_KEY
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          if [ -z "$ANTHROPIC_API_KEY" ]; then
+            echo "ANTHROPIC_API_KEY no esta como secreto de GitHub; se deja la que ya tenga el Worker."
+            exit 0
+          fi
+          printf '%s' "$ANTHROPIC_API_KEY" | npx wrangler secret put ANTHROPIC_API_KEY
+          echo "ANTHROPIC_API_KEY sincronizada."
+
       # La URL se saca de la salida del propio deploy, que siempre la imprime.
       # Es mas confiable que consultarla aparte con otro comando.
       - name: Publicar el Worker

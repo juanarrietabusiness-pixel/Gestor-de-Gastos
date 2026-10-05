@@ -10,7 +10,8 @@ export interface Env {
   SETUP_KEY?: string;
   /**
    * Clave de la API de Claude, para el consejero (ver worker/routes/consejo.ts).
-   * Se define con `wrangler secret put ANTHROPIC_API_KEY`, nunca en el codigo
+   * Se carga como secreto de GitHub y el workflow Publicar la pasa a Cloudflare
+   * (o a mano, con `wrangler secret put ANTHROPIC_API_KEY`). Nunca en el codigo
    * ni en wrangler.toml: los secretos de Cloudflare no se leen desde el
    * navegador ni aparecen en el repositorio.
    *

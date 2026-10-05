@@ -304,8 +304,8 @@ export async function preguntar(
 ): Promise<Response> {
   if (!env.ANTHROPIC_API_KEY) {
     return error(
-      'El consejero no está configurado. Falta cargar la clave con '
-      + '`wrangler secret put ANTHROPIC_API_KEY`.',
+      'El consejero no está configurado. Falta cargar ANTHROPIC_API_KEY como '
+      + 'secreto en GitHub y volver a publicar.',
       503,
     );
   }

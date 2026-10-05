@@ -268,11 +268,16 @@ montos. Cuando una pregunta necesita el detalle, tiene una herramienta para
 buscar movimientos en la base; no inventa el detalle a partir de los totales.
 
 Para encenderlo hace falta una clave de la API de Claude, cargada **una sola
-vez** como secreto de Cloudflare:
+vez** como secreto de GitHub:
 
-```bash
-wrangler secret put ANTHROPIC_API_KEY
-```
+1. Crea la clave en [platform.claude.com](https://platform.claude.com) →
+   *API Keys* → *Create Key*, y cárgale saldo en *Billing*.
+2. En el repo: Settings → Secrets and variables → Actions → *New repository
+   secret*, con el nombre `ANTHROPIC_API_KEY`.
+3. Actions → **Publicar** → *Run workflow*. El workflow se la pasa a
+   Cloudflare.
+
+(Desde una terminal también sirve `wrangler secret put ANTHROPIC_API_KEY`.)
 
 La clave nunca llega al navegador: el navegador le habla al Worker, y el Worker
 le habla a Claude. Sin la clave la app funciona igual y la pestaña lo dice.
