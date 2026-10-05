@@ -1,0 +1,48 @@
+name = "gestor-de-gastos"
+main = "worker/index.ts"
+compatibility_date = "2025-01-15"
+compatibility_flags = ["nodejs_compat"]
+
+# URL publica en workers.dev. Es la direccion por la que entran los dos.
+workers_dev = true
+
+# Las "preview URLs" se activan solas si no se dicen que no. Le dan a CADA
+# version publicada su propia direccion publica, apuntando a la MISMA base de
+# datos y con los MISMOS secretos. Para una app privada de finanzas eso es
+# superficie de ataque a cambio de nada: nunca las vamos a usar, y dejarlas
+# encendidas mantiene accesibles versiones viejas del codigo para siempre.
+preview_urls = false
+
+# El frontend compilado se sirve desde el mismo Worker.
+[assets]
+directory = "./dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+
+# Base de datos SQLite en el borde.
+# Ya creada en la cuenta, con el esquema aplicado y la migracion 0001
+# registrada en d1_migrations. El id no es secreto: sin el token de API de
+# Cloudflare no sirve de nada.
+[[d1_databases]]
+binding = "DB"
+database_name = "gastos-db"
+database_id = "be1786d4-004b-46cc-b406-405a993b01c4"
+
+# Un Durable Object por hogar: mantiene los WebSockets y reparte
+# cada cambio a los dos telefonos al instante.
+[[durable_objects.bindings]]
+name = "HUB"
+class_name = "HouseholdHub"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["HouseholdHub"]
+
+# Disparador programado de los pagos habituales.
+# Todos los dias a las 09:00 UTC, que en Argentina son las 06:00: los
+# movimientos del dia ya estan cuando cualquiera de los dos abre la app.
+[triggers]
+crons = ["0 9 * * *"]
+
+[observability]
+enabled = true

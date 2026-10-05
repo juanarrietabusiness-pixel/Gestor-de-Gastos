@@ -1,0 +1,226 @@
+# Despliegue a Cloudflare.
+#
+# Deliberadamente NO se dispara solo al hacer merge. Se lanza a mano desde la
+# pestaña Actions, y aun asi no publica nada hasta que los tests pasan: el
+# trabajo "verificar" tiene que terminar en verde para que "publicar" arranque.
+#
+# Si algun dia queres que se publique solo al mergear a main, descomenta el
+# bloque `push` de abajo. Los tests van a seguir siendo obligatorios.
+
+name: Publicar
+
+on:
+  workflow_dispatch:
+    inputs:
+      motivo:
+        description: 'Que estas publicando (queda en el historial)'
+        required: false
+        default: 'Actualizacion'
+
+  # push:
+  #   branches: [main]
+
+# Un despliegue por vez. Sin esto, dos corridas simultaneas podrian aplicar
+# migraciones cruzadas sobre la misma base.
+concurrency:
+  group: publicar
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  # ---------------------------------------------------------------------
+  # 1) La barrera. Si algo de esto falla, el despliegue no ocurre.
+  # ---------------------------------------------------------------------
+  verificar:
+    name: Tipos, tests y build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Verificar tipos (cliente y Worker)
+        run: npm run lint
+
+      - name: Tests del nucleo de dominio
+        run: npm test
+
+      - name: Compilar
+        run: npm run build
+
+      # Se guarda el resultado exacto de la compilacion para publicarlo tal
+      # cual. Recompilar en el otro job daria casi seguro lo mismo, pero asi se
+      # publica byte por byte lo que acaba de pasar los tests.
+      - name: Guardar el compilado
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          retention-days: 1
+
+  # ---------------------------------------------------------------------
+  # 2) El despliegue. `needs: verificar` es lo que impone el orden.
+  # ---------------------------------------------------------------------
+  publicar:
+    name: Publicar en Cloudflare
+    needs: verificar
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    # El entorno agrupa los secretos y te deja, si queres, exigir tu
+    # aprobacion manual antes de publicar (Settings > Environments).
+    environment: produccion
+
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # Hacen falta las dependencias para tener wrangler en la version exacta
+      # que fija package-lock.json, no la ultima que haya salido.
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Recuperar el compilado verificado
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      # Chequeos previos con mensajes claros. Es mucho mejor fallar aca, con
+      # una explicacion, que a mitad de un despliegue.
+      - name: Comprobar configuracion
+        env:
+          D1_ID: ${{ vars.CLOUDFLARE_D1_DATABASE_ID }}
+        run: |
+          falta=0
+
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "::error::Falta el secreto CLOUDFLARE_API_TOKEN."
+            falta=1
+          fi
+
+          if [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "::error::Falta el secreto CLOUDFLARE_ACCOUNT_ID."
+            falta=1
+          fi
+
+          # El id de la base puede venir de una variable de GitHub o estar
+          # escrito en wrangler.toml. Si no esta en ninguno de los dos lados,
+          # el despliegue no tiene a que base apuntar.
+          if [ -z "$D1_ID" ] && grep -q 'REEMPLAZAR_CON_TU_DATABASE_ID' wrangler.toml; then
+            echo "::error::No hay id de base de datos. Defini la variable CLOUDFLARE_D1_DATABASE_ID en Settings > Secrets and variables > Actions > Variables, o escribi el id en wrangler.toml."
+            falta=1
+          fi
+
+          [ "$falta" -eq 0 ] || exit 1
+          echo "Configuracion completa."
+
+      # Si el id vino de una variable de GitHub, se escribe en el archivo antes
+      # de desplegar. Asi no hace falta editar y commitear wrangler.toml a mano.
+      - name: Aplicar el id de la base
+        env:
+          D1_ID: ${{ vars.CLOUDFLARE_D1_DATABASE_ID }}
+        run: |
+          if [ -n "$D1_ID" ]; then
+            sed -i "s|database_id = \".*\"|database_id = \"$D1_ID\"|" wrangler.toml
+            echo "Id de base tomado de la variable de GitHub."
+          else
+            echo "Id de base tomado de wrangler.toml."
+          fi
+
+      # Additiva y segura de repetir: wrangler lleva registro de que migracion
+      # ya aplico y solo corre las nuevas.
+      - name: Aplicar migraciones de la base
+        run: npx wrangler d1 migrations apply gastos-db --remote
+
+      # Opcional. Si guardaste SETUP_KEY como secreto de GitHub, se sincroniza
+      # sola y nunca necesitas abrir una terminal. Si no, se salta: la que
+      # hayas puesto con `wrangler secret put` sigue valiendo, porque desplegar
+      # no borra los secretos existentes.
+      - name: Sincronizar SETUP_KEY
+        env:
+          SETUP_KEY: ${{ secrets.SETUP_KEY }}
+        run: |
+          if [ -z "$SETUP_KEY" ]; then
+            echo "SETUP_KEY no esta como secreto de GitHub; se deja la que ya tenga el Worker."
+            exit 0
+          fi
+          printf '%s' "$SETUP_KEY" | npx wrangler secret put SETUP_KEY
+          echo "SETUP_KEY sincronizada."
+
+      # La URL se saca de la salida del propio deploy, que siempre la imprime.
+      # Es mas confiable que consultarla aparte con otro comando.
+      - name: Publicar el Worker
+        id: deploy
+        run: |
+          npx wrangler deploy 2>&1 | tee salida-deploy.txt
+          # El codigo de salida que importa es el de wrangler, no el de tee.
+          codigo=${PIPESTATUS[0]}
+          [ "$codigo" -eq 0 ] || exit "$codigo"
+
+          url=$(grep -oE 'https://[a-zA-Z0-9._-]+\.workers\.dev' salida-deploy.txt | head -1)
+          if [ -z "$url" ]; then
+            # Puede ser un dominio propio en vez de workers.dev.
+            url=$(grep -oE 'https://[a-zA-Z0-9._-]+\.[a-zA-Z]{2,}' salida-deploy.txt | head -1)
+          fi
+
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "URL detectada: ${url:-(ninguna)}"
+
+      # Comprobacion de humo: que lo recien publicado conteste de verdad.
+      # Un despliegue que termina en verde pero deja la app caida es peor que
+      # uno que falla, porque nadie se entera hasta que alguien la abre.
+      - name: Verificar que quedo andando
+        env:
+          URL: ${{ steps.deploy.outputs.url }}
+        run: |
+          if [ -z "$URL" ]; then
+            echo "No se pudo detectar la URL; se omite la comprobacion."
+            exit 0
+          fi
+
+          echo "Consultando $URL/api/status"
+          codigo=000
+          for intento in 1 2 3 4 5; do
+            codigo=$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 "$URL/api/status" || echo "000")
+            if [ "$codigo" = "200" ]; then
+              echo "La app responde correctamente."
+              exit 0
+            fi
+            echo "Intento $intento: codigo $codigo. Reintentando en 5s..."
+            sleep 5
+          done
+
+          echo "::error::La app no respondio despues de publicar (ultimo codigo: $codigo)."
+          exit 1
+
+      - name: Resumen
+        run: |
+          {
+            echo "### Publicado"
+            echo ""
+            echo "- **Motivo:** ${{ inputs.motivo }}"
+            echo "- **Commit:** \`${{ github.sha }}\`"
+            echo "- **Lanzado por:** @${{ github.actor }}"
+            if [ -n "${{ steps.deploy.outputs.url }}" ]; then
+              echo "- **URL:** ${{ steps.deploy.outputs.url }}"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

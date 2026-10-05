@@ -1,0 +1,69 @@
+# Verificacion continua.
+#
+# Corre en cada push y en cada pull request. NO despliega nada: su unico
+# trabajo es decirte si el codigo esta sano antes de que decidas publicar.
+
+name: Verificar
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  # Permite lanzarlo a mano desde la pestaña Actions.
+  workflow_dispatch:
+
+# Si empujas dos veces seguidas, cancela la corrida vieja en lugar de
+# dejar las dos compitiendo.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verificar:
+    name: Tipos, tests y build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # npm ci instala exactamente lo que dice package-lock.json.
+      # A diferencia de npm install, no actualiza nada por su cuenta: lo que
+      # se prueba aca es lo mismo que corre en produccion.
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Verificar tipos (cliente y Worker)
+        run: npm run lint
+
+      - name: Tests del nucleo de dominio
+        run: npm test
+
+      - name: Compilar
+        run: npm run build
+
+      # Red de seguridad: el repo no debe volver a depender de Google.
+      # Si alguna vez reaparece un import de Firebase o una llamada a
+      # gstatic, esto lo frena antes de que llegue a produccion.
+      - name: Comprobar que no volvio ninguna dependencia de Google
+        run: |
+          if grep -rl 'gstatic\|googleapis\|firebase\|@google/genai' \
+              --include='*.ts' --include='*.tsx' --include='*.json' \
+              --include='*.html' --include='*.js' \
+              shared worker src public index.html 2>/dev/null | grep -q .; then
+            echo "::error::Reaparecio una dependencia de Google en el codigo."
+            grep -rn 'gstatic\|googleapis\|firebase\|@google/genai' \
+              --include='*.ts' --include='*.tsx' --include='*.json' \
+              --include='*.html' --include='*.js' \
+              shared worker src public index.html 2>/dev/null
+            exit 1
+          fi
+          echo "Sin rastros de Google."

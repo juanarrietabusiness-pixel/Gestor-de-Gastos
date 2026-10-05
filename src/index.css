@@ -1,0 +1,559 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-sans: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', ui-sans-serif, system-ui, 'Segoe UI', Roboto, sans-serif;
+  --color-marca-50: #ecfdf5;
+  --color-marca-100: #d1fae5;
+  --color-marca-500: #10b981;
+  --color-marca-600: #067a57;
+  --color-marca-700: #047857;
+  /* Sombras amplias y difusas: flotan sin bordes duros. */
+  --shadow-tarjeta: 0 1px 2px rgb(0 0 0 / 0.05), 0 10px 30px -14px rgb(0 0 0 / 0.18);
+  --shadow-flotante: 0 2px 6px rgb(0 0 0 / 0.08), 0 20px 50px -12px rgb(0 0 0 / 0.28);
+}
+
+@layer base {
+  :root {
+    color-scheme: light dark;
+    /* Grises neutros del sistema: la pagina hunde, las tarjetas flotan. */
+    --fondo: #f2f2f7;
+    --superficie: #ffffff;
+    --superficie-2: #e9e9ee;
+    --borde: #e2e2e7;
+    --texto: #1c1c1e;
+    --texto-2: #515154;
+    --texto-3: #636366;
+    /* Mezcla de los chips de color: glifo 70% color + 30% tinta oscura
+       sobre fondo 14% color, verificado ≥3:1 en los 24 colores. */
+    --alfa-tinta: 14%;
+    --peso-glifo: 70%;
+    --tinte-tinta: #1c1c1e;
+  }
+
+  /* El tema de cada persona se estampa en <html data-tema="...">.
+     Tres bloques y no dos: uno para el sistema (guardado con :not, asi la
+     eleccion manual le gana), y uno por cada eleccion explicita, para que
+     elegir "claro" en un telefono en oscuro funcione igual de bien que al
+     reves. */
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-tema='claro']) {
+      --fondo: #000000;
+      --superficie: #1c1c1e;
+      --superficie-2: #2c2c2e;
+      --borde: #38383a;
+      --texto: #f5f5f7;
+      --texto-2: #aeaeb2;
+      --texto-3: #98989f;
+      /* En oscuro el glifo se aclara (82% color + 18% blanco) sobre 15%. */
+      --alfa-tinta: 15%;
+      --peso-glifo: 82%;
+      --tinte-tinta: #ffffff;
+    }
+  }
+
+  :root[data-tema='oscuro'] {
+      --fondo: #000000;
+      --superficie: #1c1c1e;
+      --superficie-2: #2c2c2e;
+      --borde: #38383a;
+      --texto: #f5f5f7;
+      --texto-2: #aeaeb2;
+      --texto-3: #98989f;
+      /* En oscuro el glifo se aclara (82% color + 18% blanco) sobre 15%. */
+      --alfa-tinta: 15%;
+      --peso-glifo: 82%;
+      --tinte-tinta: #ffffff;
+    }
+
+  html {
+    /* Evita el zoom automatico de iOS al enfocar un input. */
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background: var(--fondo);
+    color: var(--texto);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    /* Cancela el rebote elastico que en iOS deja ver el fondo del navegador. */
+    overscroll-behavior-y: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Titulares compactos como en el sistema: -0.02em y sin viudas. */
+  h1, h2 {
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+  }
+
+  ::selection {
+    background: color-mix(in srgb, var(--color-marca-500) 25%, transparent);
+  }
+
+  /* Anillo de foco solo con teclado, del color de la marca. */
+  button:focus-visible, a:focus-visible, summary:focus-visible {
+    outline: 2px solid var(--color-marca-500);
+    outline-offset: 2px;
+  }
+
+  /* Respeta la preferencia de sistema de quien marea con las animaciones. */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+
+  /* Sin transparencias si el sistema lo pide: todo solido. */
+  @media (prefers-reduced-transparency: reduce) {
+    .barra-vidrio {
+      background: var(--superficie);
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+    }
+    .borde-luz {
+      box-shadow: none;
+    }
+    .hoja-scrim {
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+      background: rgb(0 0 0 / 0.5);
+    }
+    .ficha {
+      background: var(--superficie-2);
+    }
+  }
+
+  /* Los numeros de plata alineados en columna, sin bailar al cambiar. */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@layer utilities {
+  .safe-bottom { padding-bottom: env(safe-area-inset-bottom, 0px); }
+
+  /*
+   * A cuanto del borde de abajo se planta la barra flotante.
+   *
+   * Sumarle el area segura ENTERA la mandaba a 36px del piso en un iPhone: en
+   * el emulador del navegador se veia pegada abajo (ahi el area segura es 0) y
+   * en el telefono de verdad quedaba flotando muy arriba, nada que ver con la
+   * de Instagram o la de Spotify.
+   *
+   * Esas apps no empujan la barra por encima del indicador de inicio: dejan
+   * que el fondo llegue hasta abajo y solo mantienen los iconos fuera de su
+   * camino. Acá, que es una pastilla flotante, se hace con una fraccion: sube
+   * lo justo para no pisar el indicador (~11px de los 34) y no mas.
+   */
+  :root {
+    --piso: max(0.5rem, calc(env(safe-area-inset-bottom, 0px) / 3));
+  }
+  .safe-top { padding-top: env(safe-area-inset-top, 0px); }
+  /* background-color, NO el atajo `background`.
+     El atajo tambien reescribe background-image, y como estas viven en la
+     misma capa que las utilidades de Tailwind pero mas abajo, le ganaban por
+     orden a cualquier gradiente puesto sobre una Tarjeta: el balance del mes
+     quedaba texto blanco sobre tarjeta blanca, invisible. */
+  .superficie { background-color: var(--superficie); }
+  .superficie-2 { background-color: var(--superficie-2); }
+  .borde { border-color: var(--borde); }
+  .txt { color: var(--texto); }
+  .txt-2 { color: var(--texto-2); }
+  .txt-3 { color: var(--texto-3); }
+  /* Barra y cabeceras translucidas con blur y saturacion, como el sistema. */
+  .barra-vidrio {
+    background: var(--superficie);
+    background: color-mix(in srgb, var(--superficie) 72%, transparent);
+    -webkit-backdrop-filter: blur(20px) saturate(1.8);
+    backdrop-filter: blur(20px) saturate(1.8);
+  }
+  /* Filete de luz en el borde superior de las barras flotantes. */
+  .borde-luz {
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.55);
+  }
+  /* Pildora flotante movil.
+     Estaba al 36% de superficie con un borde blanco al 58% y dos brillos
+     interiores fuertes: eso no es vidrio, es plastico esmerilado. El vidrio se
+     nota por lo que deja pasar, no por lo que se le pinta encima. Ahora el
+     fondo casi no existe, el blur hace el trabajo, y el borde es un pelo. */
+  .barra-flotante {
+    isolation: isolate;
+    /* El respaldo, para navegadores sin color-mix: opaco antes que roto. */
+    background: var(--superficie);
+    /*
+     * Casi nada de pintura encima: 11% de superficie (era 62%, paso a 37% y de
+     * ahi otro 70% menos). El vidrio se nota por lo que deja pasar, no por lo
+     * que se le dibuja.
+     *
+     * Con tan poco fondo propio, TODO el trabajo de separar los iconos de lo
+     * que pasa por debajo lo hace el desenfoque: 44px y saturacion alta, que es
+     * lo que le da el color al vidrio en vez de lavarlo.
+     */
+    background: color-mix(in srgb, var(--superficie) 11%, transparent);
+    -webkit-backdrop-filter: blur(44px) saturate(2.2);
+    backdrop-filter: blur(44px) saturate(2.2);
+    border: 0.5px solid rgb(0 0 0 / 0.06);
+    box-shadow:
+      inset 0 0.5px 0 rgb(255 255 255 / 0.55),
+      0 6px 24px -8px rgb(0 0 0 / 0.16);
+    transition:
+      padding 0.28s cubic-bezier(0.32, 0.72, 0, 1),
+      transform 0.28s cubic-bezier(0.32, 0.72, 0, 1);
+  }
+  /* Luz del tab activo: un solo indicador que se desliza entre destinos. */
+  .luz-deslizante {
+    position: absolute;
+    top: 4px;
+    left: 0;
+    height: 3px;
+    z-index: 1;
+    pointer-events: none;
+    display: flex;
+    justify-content: center;
+    transition: transform 0.32s cubic-bezier(0.32, 0.72, 0, 1);
+  }
+  .luz-deslizante::before {
+    content: '';
+    width: 1.25rem;
+    height: 3px;
+    border-radius: 9999px;
+    background: var(--color-marca-500);
+    box-shadow: 0 0 8px color-mix(in srgb, var(--color-marca-500) 70%, transparent);
+  }
+  /* Chip de color con contraste garantizado. El color vivo va en --c. */
+  .ficha {
+    background: color-mix(in srgb, var(--c) var(--alfa-tinta), var(--superficie));
+    color: color-mix(in srgb, var(--c) var(--peso-glifo), var(--tinte-tinta));
+  }
+  @supports not (color: color-mix(in srgb, red 50%, blue)) {
+    .ficha {
+      background: var(--superficie-2);
+      color: var(--c);
+    }
+  }
+  /* Velo oscuro detras de hojas y dialogos, con blur suave. */
+  .hoja-scrim {
+    background: rgb(0 0 0 / 0.32);
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+  }
+  /* Oculta la barra de scroll sin perder el scroll. */
+  .sin-barra { scrollbar-width: none; }
+  .sin-barra::-webkit-scrollbar { display: none; }
+
+  /*
+   * Una fila que acaba de llegar del otro telefono.
+   *
+   * Entra desde arriba y se despinta sola: el resaltado dura lo que dura la
+   * animacion y no queda ningun estilo pegado, asi que un rato despues la fila
+   * es igual a todas. Sin esto, la fila aparece de la nada en medio de la
+   * lista y no hay forma de saber que es nueva.
+   */
+  .fila-nueva {
+    animation: fila-entra 1.6s cubic-bezier(0.32, 0.72, 0, 1);
+  }
+  @keyframes fila-entra {
+    0% {
+      opacity: 0;
+      transform: translateY(-8px);
+      background: color-mix(in srgb, var(--color-marca-500) 18%, transparent);
+    }
+    22% {
+      opacity: 1;
+      transform: none;
+      background: color-mix(in srgb, var(--color-marca-500) 18%, transparent);
+    }
+    100% {
+      opacity: 1;
+      transform: none;
+      background: transparent;
+    }
+  }
+}
+
+/* Quien pidio menos movimiento ve el resaltado, pero no el desplazamiento. */
+@media (prefers-reduced-motion: reduce) {
+  .fila-nueva {
+    animation: fila-entra-quieta 1.6s ease-out;
+  }
+  @keyframes fila-entra-quieta {
+    0%, 22% { background: color-mix(in srgb, var(--color-marca-500) 18%, transparent); }
+    100% { background: transparent; }
+  }
+}
+
+/*
+ * QUE SIGNIFICA CADA COLOR. Una sola regla para toda la app.
+ *
+ * Existe porque el rojo se habia vuelto decorativo: pintaba el gasto del mes,
+ * el "salio" de una jarra, el peor mes aunque hubiera cerrado en positivo. Un
+ * rojo que aparece cuando no pasa nada no avisa de nada, y ademas ensucia
+ * pantallas donde todo esta bien.
+ *
+ *   rojo (--color-red-500)    SOLO un problema de verdad: un saldo en negativo,
+ *                             una jarra de la que salio mas de lo que entro, un
+ *                             tope pasado, un error, o el boton de borrar.
+ *                             Que salga plata NO es un problema.
+ *   verde (--color-marca-*)   plata que entra, y lo que queda disponible.
+ *   ambar                     algo que conviene mirar y todavia no rompio nada.
+ *   neutro (txt / txt-2)      todo lo demas, incluido el gasto. Es lo normal.
+ *   color propio              identidad, no estado: el color de una categoria,
+ *                             de una jarra, de una economia o de una persona.
+ *                             Nunca dice si algo esta bien o mal.
+ */
+
+/* El vidrio de la barra, en oscuro.
+   Va dos veces a proposito: el media query cubre a quien tiene el sistema en
+   oscuro y no eligio nada (por eso el `:not([data-tema='claro'])`), y el
+   bloque de abajo a quien eligio oscuro a mano teniendo el sistema en claro,
+   que el media query no alcanza. Los dos dicen exactamente lo mismo. */
+@media (prefers-color-scheme: dark) {
+  @layer utilities {
+    :root:not([data-tema='claro']) .borde-luz {
+      box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.08);
+    }
+    :root:not([data-tema='claro']) .barra-flotante {
+      background: color-mix(in srgb, var(--superficie) 10%, transparent);
+      -webkit-backdrop-filter: blur(44px) saturate(2);
+      backdrop-filter: blur(44px) saturate(2);
+      border: 0.5px solid rgb(255 255 255 / 0.10);
+      box-shadow:
+        inset 0 0.5px 0 rgb(255 255 255 / 0.10),
+        0 6px 24px -8px rgb(0 0 0 / 0.5);
+    }
+  }
+}
+
+@layer utilities {
+  :root[data-tema='oscuro'] .borde-luz {
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.08);
+  }
+  :root[data-tema='oscuro'] .barra-flotante {
+    background: color-mix(in srgb, var(--superficie) 10%, transparent);
+    -webkit-backdrop-filter: blur(44px) saturate(2);
+    backdrop-filter: blur(44px) saturate(2);
+    border: 0.5px solid rgb(255 255 255 / 0.10);
+    box-shadow:
+      inset 0 0.5px 0 rgb(255 255 255 / 0.10),
+      0 6px 24px -8px rgb(0 0 0 / 0.5);
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .barra-flotante {
+    background: var(--superficie);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  .luz-deslizante::before {
+    box-shadow: none;
+  }
+}
+
+@layer utilities {
+  /*
+   * El deslizador de porcentaje.
+   *
+   * El nativo trae un pulgar de 12px: en un teléfono hay que acertarle con el
+   * dedo y cualquier temblor mueve el valor varios puntos. Este tiene 26px de
+   * agarre sobre una pista de 8px, y la parte ya recorrida va pintada del color
+   * de la jarra, así que se ve de un vistazo cuánto se lleva cada una.
+   */
+  .deslizador {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 26px;
+    background: transparent;
+    touch-action: none;
+  }
+  .deslizador::-webkit-slider-runnable-track {
+    height: 8px;
+    border-radius: 9999px;
+    background: linear-gradient(
+      to right,
+      var(--c, var(--color-marca-500)) var(--avance, 0%),
+      var(--superficie-2) var(--avance, 0%)
+    );
+  }
+  .deslizador::-moz-range-track {
+    height: 8px;
+    border-radius: 9999px;
+    background: linear-gradient(
+      to right,
+      var(--c, var(--color-marca-500)) var(--avance, 0%),
+      var(--superficie-2) var(--avance, 0%)
+    );
+  }
+  .deslizador::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 26px;
+    height: 26px;
+    margin-top: -9px;
+    border-radius: 9999px;
+    background: #fff;
+    border: 0.5px solid rgb(0 0 0 / 0.1);
+    box-shadow: 0 1px 4px rgb(0 0 0 / 0.25);
+  }
+  .deslizador::-moz-range-thumb {
+    width: 26px;
+    height: 26px;
+    border: 0.5px solid rgb(0 0 0 / 0.1);
+    border-radius: 9999px;
+    background: #fff;
+    box-shadow: 0 1px 4px rgb(0 0 0 / 0.25);
+  }
+  .deslizador:focus-visible::-webkit-slider-thumb {
+    outline: 2px solid var(--color-marca-500);
+    outline-offset: 2px;
+  }
+}
+
+/*
+ * ESCALA TIPOGRAFICA. Una sola para toda la app.
+ *
+ * Antes cada pantalla elegia su tamaño a mano y habia doce: 9, 10, 11, 12,
+ * 13, 14, 16, 18, 20, 24, 30 y 44 px. El mismo renglon —el nombre de una
+ * fila— se veia de un tamaño en Jarras, de otro en Ajustes y de otro en la
+ * papelera, y las descripciones igual. No era una decision de diseño, era
+ * lo que habia quedado.
+ *
+ * Ahora hay cuatro tamaños de texto y cada uno tiene un trabajo. La regla
+ * para elegir es qué ES el texto, no cuánto se quiere que ocupe:
+ *
+ *   .t-seccion   UN TITULO, el que sea. El de una pantalla ("Nuevo
+ *                movimiento", "Ajustar jarras") y el de una tarjeta ("En qué
+ *                se fue", "Patrimonio", "Pagos habituales") son el mismo
+ *                tamaño a proposito.
+ *
+ *                Habia dos niveles, .t-titulo a 20px para las pantallas y
+ *                este a 15px para las tarjetas, y no se sostenia: el Inicio
+ *                es una pila de tarjetas donde cada una ES una seccion, asi
+ *                que "Patrimonio" y "Balance del mes" no son menos titulo
+ *                que "Nuevo movimiento". Con dos niveles habia que decidir
+ *                cual era cual cada vez que se escribia una pantalla nueva,
+ *                y se decidia distinto cada vez. Con uno no hay nada que
+ *                decidir: todo titulo va en .t-seccion y en font-semibold.
+ *
+ *                Lo que separa un titulo de lo que tiene debajo es el
+ *                GROSOR y el color, no el tamaño.
+ *   .t-fila      el texto principal de una fila, un boton o una opcion.
+ *   .t-nota      todo lo secundario: descripciones, metadatos, etiquetas.
+ *   .t-campo     lo que se escribe. 16px es el minimo que evita el zoom
+ *                automatico de iOS al enfocar un input, asi que este no baja.
+ *
+ * Y dos para los numeros grandes, que no son texto sino el dato en si:
+ *
+ *   .t-monto     el numero que corona una tarjeta.
+ *   .t-cifra     el numero de la pantalla: el patrimonio, el saldo de una
+ *                jarra, el monto que se esta tecleando. 36px y no 44 como
+ *                tenia el patrimonio: a 44 un patrimonio de siete cifras se
+ *                salia de la tarjeta, y ademas es el mismo tamaño que ahora
+ *                usa el campo del monto, que a 30 se veia mas chico que el
+ *                dato que estaba escribiendo.
+ *
+ * Y .t-glifo, que no es texto: es el tamaño de un emoji dibujado dentro de
+ * un boton. Vive aca para que no vuelva a aparecer un `text-xl` suelto.
+ *
+ * Solo tamaño e interlineado a proposito. El grosor (font-medium,
+ * font-semibold) y el interletrado (tracking-tight) siguen siendo utilidades
+ * sueltas: si viviesen aca, la clase le ganaria por orden a la utilidad y no
+ * se podria poner un titulo en negrita sin pelearse con el CSS.
+ */
+@layer utilities {
+  .t-seccion { font-size: 0.9375rem; line-height: 1.25rem; }
+  .t-fila    { font-size: 0.875rem;  line-height: 1.25rem; }
+  .t-nota    { font-size: 0.75rem;   line-height: 1rem; }
+  .t-campo   { font-size: 1rem;      line-height: 1.5rem; }
+  .t-monto   { font-size: 1.5rem;    line-height: 1.75rem; }
+  .t-cifra   { font-size: 2.25rem;   line-height: 2.5rem; }
+  .t-glifo   { font-size: 1.25rem;   line-height: 1; }
+}
+
+/*
+ * EL CAMPO DE FECHA, DENTRO DE SU CAJA.
+ *
+ * El `input[type=date]` nativo no mide lo que le dices: mide lo que necesita
+ * su contenido. WebKit le da un ancho INTRINSECO —el del texto de la fecha mas
+ * el icono del calendario mas los rellenos de cada tramo— y ese ancho es un
+ * minimo, no una sugerencia. Con `w-full` y `px-3.5` encima, la caja pedia mas
+ * de lo que tenia y se desbordaba: la barra de la fecha se ensanchaba al
+ * tocarla, se salia de la proporcion del formulario y arrastraba de lado a la
+ * hoja entera. Quieta —sin tocar, o ya cambiada— se veia bien, porque el que
+ * se pasa de ancho es el editor, no el valor.
+ *
+ * Se arregla soltandole ese minimo (`min-width: 0`), quitandole el aspecto
+ * nativo y ordenando sus tres piezas a mano: el valor pegado a la izquierda
+ * sin margenes propios, y el icono del calendario empujado al otro extremo.
+ * Asi ocupa exactamente el ancho de su caja, ni uno mas, y se ve igual que el
+ * boton que reemplaza.
+ */
+@layer base {
+  input[type='date'],
+  input[type='month'],
+  input[type='week'],
+  input[type='time'],
+  input[type='datetime-local'] {
+    -webkit-appearance: none;
+    appearance: none;
+    /* El ancho intrinseco de WebKit, desactivado: sin esto lo de abajo no
+       alcanza, porque el minimo le gana igual al `width`. */
+    min-width: 0;
+    max-width: 100%;
+    /* Safari no lo trata como bloque y lo deja alinearse solo. */
+    display: block;
+  }
+
+  input[type='date']::-webkit-date-and-time-value,
+  input[type='month']::-webkit-date-and-time-value,
+  input[type='time']::-webkit-date-and-time-value,
+  input[type='datetime-local']::-webkit-date-and-time-value {
+    text-align: left;
+    margin: 0;
+    min-width: 0;
+  }
+
+  input[type='date']::-webkit-datetime-edit,
+  input[type='month']::-webkit-datetime-edit,
+  input[type='time']::-webkit-datetime-edit,
+  input[type='datetime-local']::-webkit-datetime-edit {
+    padding: 0;
+  }
+
+  /* Cada tramo (dia, mes, año) trae su propio relleno; sumados son los que
+     empujaban el icono fuera de la caja. */
+  input[type='date']::-webkit-datetime-edit-fields-wrapper,
+  input[type='month']::-webkit-datetime-edit-fields-wrapper,
+  input[type='time']::-webkit-datetime-edit-fields-wrapper,
+  input[type='datetime-local']::-webkit-datetime-edit-fields-wrapper {
+    padding: 0;
+  }
+
+  /* El calendario, contra el borde derecho y del gris del resto de los
+     iconos, en vez de negro sobre la tarjeta oscura. */
+  input[type='date']::-webkit-calendar-picker-indicator,
+  input[type='month']::-webkit-calendar-picker-indicator,
+  input[type='week']::-webkit-calendar-picker-indicator,
+  input[type='time']::-webkit-calendar-picker-indicator,
+  input[type='datetime-local']::-webkit-calendar-picker-indicator {
+    margin: 0;
+    margin-inline-start: auto;
+    padding: 0;
+    opacity: 0.45;
+    cursor: pointer;
+  }
+
+  /* Dos bloques, como el resto del tema: uno para quien tiene el sistema en
+     oscuro y no eligio nada, y otro para quien eligio oscuro a mano. */
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-tema='claro']) input::-webkit-calendar-picker-indicator {
+      filter: invert(1);
+    }
+  }
+  :root[data-tema='oscuro'] input::-webkit-calendar-picker-indicator {
+    filter: invert(1);
+  }
+}

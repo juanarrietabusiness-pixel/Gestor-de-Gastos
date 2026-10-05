@@ -1,0 +1,67 @@
+# Prueba de humo del tiempo real, contra produccion.
+#
+# Responde una pregunta que ni los tests ni el despliegue contestan: ¿lo que
+# carga uno le aparece al otro de verdad, en el Cloudflare real?
+#
+# En local wrangler simula los Durable Objects, asi que una prueba local no
+# demuestra nada sobre la hibernacion de WebSockets, el enrutado a una unica
+# instancia global, ni el upgrade de protocolo detras del borde.
+#
+# Siembra un hogar de prueba, lo ejercita y lo borra. No toca los datos reales:
+# todo cuelga de un household_id propio con prefijo __smoke__.
+
+name: Probar tiempo real
+
+on:
+  workflow_dispatch:
+    inputs:
+      prueba:
+        description: 'Que ejecutar'
+        type: choice
+        default: humo
+        options: [humo, diagnostico, alta]
+
+concurrency:
+  group: smoke
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  probar:
+    name: Tiempo real en produccion
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    environment: produccion
+
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # Node 22 trae WebSocket nativo; no hace falta dependencia extra.
+          node-version: 22
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Ejecutar la prueba
+        env:
+          # La URL publicada. Se puede sobrescribir con la variable URL_APP
+          # (Settings > Secrets and variables > Actions > Variables) si algun
+          # dia se cambia el nombre del Worker o se pasa a dominio propio.
+          URL_APP: ${{ vars.URL_APP || 'https://gestor-de-gastos.abrinay1997.workers.dev' }}
+          # Solo la prueba 'alta' la usa, para ejercitar el camino real.
+          SETUP_KEY: ${{ secrets.SETUP_KEY }}
+        run: |
+          case "${{ inputs.prueba }}" in
+            diagnostico) node scripts/diagnostico.mjs ;;
+            alta)        node scripts/prueba-alta.mjs ;;
+            *)           node scripts/smoke-realtime.mjs ;;
+          esac
